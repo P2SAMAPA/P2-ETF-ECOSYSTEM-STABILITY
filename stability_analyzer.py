@@ -1,12 +1,12 @@
 """
-Ecosystem stability using community matrix (VAR(1) via OLS per row) and eigenvalue analysis.
+Ecosystem stability using community matrix (VAR(1)) and eigenvalue analysis.
 """
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from scipy.linalg import eig
-import config
 import warnings
+import config
 
 class EcosystemStability:
     def __init__(self, window=252, var_lag=1):
@@ -20,31 +20,29 @@ class EcosystemStability:
     def fit(self, returns):
         """
         returns: (T, n) numpy array of log returns (T >= window)
+        Estimate community matrix J via OLS: r_{t+1} = J * r_t + c
         """
         if returns.shape[0] < self.window:
             return False
-        Y = returns[-self.window:]   # use last window
+        Y = returns[-self.window:]  # (window, n)
         n = Y.shape[1]
-        # Build X = lagged returns (t) and y = returns at t+1
-        X = Y[:-1]
-        y = Y[1:]
-        # If n is too large, ensure enough samples
-        if X.shape[0] < n + 1:
-            return False
-        J = np.zeros((n, n))
-        # For each asset i, regress y[:,i] on X (all assets' lagged returns)
-        for i in range(n):
-            reg = LinearRegression(fit_intercept=False)  # we don't include intercept? Could add but then J includes constant? We'll use no intercept to keep pure interaction.
-            reg.fit(X, y[:, i])
-            J[i, :] = reg.coef_
-        self.J_ = J
-        # Compute eigenvalues
-        self.eigenvalues_ = eig(self.J_)[0]
-        self.lambda_max_ = np.max(self.eigenvalues_.real)
-        # Left eigenvector of largest eigenvalue
-        _, v, _ = eig(self.J_, left=True, right=False)
-        idx = np.argmax(self.eigenvalues_.real)
-        left_eig = v[:, idx]
+        # Build lagged matrix X = r_t
+        X = Y[:-1]   # (window-1, n)
+        y = Y[1:]    # (window-1, n)
+        # Estimate J column by column (each asset's next return as function of all current returns)
+        J_est = np.zeros((n, n))
+        for j in range(n):
+            reg = LinearRegression(fit_intercept=True)
+            reg.fit(X, y[:, j])
+            J_est[:, j] = reg.coef_   # shape (n,)
+        self.J_ = J_est
+        # Compute eigenvalues and left eigenvectors
+        w, vl = eig(self.J_, left=True, right=False)   # w = eigenvalues, vl = left eigenvectors
+        self.eigenvalues_ = w
+        self.lambda_max_ = np.max(w.real)
+        # Get left eigenvector for the largest eigenvalue
+        idx = np.argmax(w.real)
+        left_eig = vl[:, idx]
         left_eig = np.abs(left_eig) / (np.sum(np.abs(left_eig)) + 1e-12)
         self.destabilizing_ = left_eig
         return True
