@@ -66,21 +66,41 @@ for universe_name, uni_data in universes.items():
     status = uni_data.get("stability_status", "?")
     lam = uni_data.get("lambda_max", 0.0)
     win = uni_data.get("selected_window", "?")
+    diversity = uni_data.get("effective_diversity", 0.0)
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(f"{universe_name} Stability", status.upper())
+        st.metric(f"{universe_name} Stability", status.upper(), delta=None)
     with col2:
         st.metric("λ_max", f"{lam:.4f}")
     with col3:
         st.metric("Window (days)", win)
     with col4:
-        st.metric("Effective Diversity", f"{uni_data.get('effective_diversity',0):.1f}")
+        st.metric("Effective Diversity", f"{diversity:.1f}")
+    
     # Destabilising ETFs
     destab = uni_data.get("destabilizing_etfs", [])
     if destab:
-        st.write("**Most destabilising ETFs:**")
+        st.write("**Most destabilising ETFs (by influence on eigenvalue):**")
         for d in destab[:3]:
-            st.markdown(f"- {d['ticker']} (impact {d['impact']:.3f})")
+            st.markdown(f"- **{d['ticker']}** (impact {d['impact']:.3f})")
+    
+    # ================== EXPLANATION ==================
+    with st.expander("📘 Why are destabilising ETFs the best for returns?"):
+        st.markdown("""
+        In an **unstable ecosystem** (λ_max > 0), the system is far from equilibrium – small shocks are amplified.  
+        The **left eigenvector** of the largest eigenvalue tells us which assets have the greatest **dynamic influence** on the entire market.  
+        These assets:
+        - Drive the system's motion
+        - Exhibit the largest fluctuations (both up and down)
+        - Are the **most likely to produce extreme returns** (positive or negative)
+
+        **For a return‑seeking strategy:**  
+        When the market is unstable, focusing on the most destabilising ETFs gives you the highest potential for large moves.  
+        (In stable systems, such assets are less reliable; the engine already selects the optimal window to capture instability.)
+
+        *Note: This signal is non‑directional – we only anticipate high volatility. Combine with a directional model (e.g., momentum) for trading.*
+        """)
     st.divider()
 
 # Detailed view
@@ -100,4 +120,4 @@ if selected:
     else:
         st.info("No per‑ticker data available.")
 
-st.caption("Positive λ_max implies the system is structurally unstable (May's theorem). Destabilising ETFs have high influence on the largest eigenvalue.")
+st.caption("Positive λ_max implies the system is structurally unstable (May's theorem). Destabilising ETFs have high influence on the largest eigenvalue and are likely to produce large returns.")
